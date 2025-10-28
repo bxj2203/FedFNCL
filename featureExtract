@@ -1,0 +1,44 @@
+import SimpleITK as sitk
+import numpy as np
+import cv2
+import csv
+import glob
+import pandas as pd
+from tqdm import tqdm
+from radiomics import featureextractor,logging
+logging.getLogger('radiomics').setLevel(logging.ERROR)
+def load_image(image_path):
+    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    return sitk.GetImageFromArray(image)
+    
+if __name__ == '__main__':
+    img_paths = glob.glob(r"path\*.jpg")
+    all_features = {}
+    df = pd.DataFrame()
+    flg = 1
+    extractor = featureextractor.RadiomicsFeatureExtractor()
+    extractor.disableAllFeatures()
+    extractor.enableAllFeatures()
+    error = []
+    for p in tqdm(img_paths):
+        mask_path = p.replace('images', 'masks')
+        image = load_image(p)
+        mask = load_image(mask_path)
+        try:
+            features = extractor.execute(image, mask)
+        except:
+            error.append(p)
+
+        image_name = p.split('\\')[-1].split('.')[0]
+        f = []
+        f_values = []
+        for feature_name, feature_value in features.items():
+            f.append(feature_name)
+            f_values.append(feature_value)
+        cleaned_data = [float(item) if isinstance(item, (int, float, np.ndarray)) else None for item in f_values]
+        if flg:
+            df['feature'] = f
+            flg = 0
+        df[image_name] = cleaned_data
+
+    df.to_excel(r"path\BIDMC_feature.xlsx")
